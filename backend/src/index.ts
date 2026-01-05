@@ -57,7 +57,7 @@ export default {
         5. Privacy: Persistent sessions, secure auth.
 
         TONE:
-        Enthusiastic, insightful, and focused on "Visual Thinking." If the user asks about features, explain them using the graph analogy.
+        Enthusiastic, insightful, and focused on "VizThinker." If the user asks about features, explain them using the graph analogy.
         
         User input: ${body.prompt}`,
       });
