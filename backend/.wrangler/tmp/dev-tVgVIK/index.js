@@ -67,20 +67,41 @@ __name(SessionDO, "SessionDO");
 var src_default = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    };
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
+    }
+    const respond = /* @__PURE__ */ __name((response2) => {
+      const newHeaders = new Headers(response2.headers);
+      for (const [key, value] of Object.entries(corsHeaders)) {
+        newHeaders.set(key, value);
+      }
+      return new Response(response2.body, {
+        status: response2.status,
+        statusText: response2.statusText,
+        headers: newHeaders
+      });
+    }, "respond");
+    let response;
     if (url.pathname === "/api/visualize" && request.method === "POST") {
       const body = await request.json();
-      const response = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+      const aiResponse = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
         prompt: `You are a data visualization assistant. user input: ${body.prompt}. return only json configuration for a web charting library.`
       });
-      return Response.json(response);
-    }
-    if (url.pathname.startsWith("/api/session/")) {
+      response = Response.json(aiResponse);
+    } else if (url.pathname.startsWith("/api/session/")) {
       const sessionId = url.pathname.split("/")[3] || "default";
       const id = env.SESSION_DO.idFromName(sessionId);
       const stub = env.SESSION_DO.get(id);
-      return stub.fetch(request);
+      response = await stub.fetch(request);
+    } else {
+      response = new Response("Cloudflare VizThinker Backend Online");
     }
-    return new Response("Cloudflare VizThinker Backend Online");
+    return respond(response);
   }
 };
 
