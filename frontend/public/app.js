@@ -2,7 +2,7 @@
 // Configuration
 // In production, this would be your *.workers.dev URL. 
 // For local dev with `wrangler dev`, it's usually http://localhost:8787
-const WORKER_URL = "http://localhost:8787"; 
+const WORKER_URL = "https://vizthinker.chunyuan-hsu-me.workers.dev"; 
 
 const sendBtn = document.getElementById('send-btn');
 const inputField = document.getElementById('user-input');
