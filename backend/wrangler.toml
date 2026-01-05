@@ -1,4 +1,4 @@
-name = "cf_ai_vizthinker_backend"
+name = "vizthinker"
 main = "src/index.ts"
 compatibility_date = "2024-04-05"
 compatibility_flags = ["nodejs_compat"]
@@ -14,7 +14,7 @@ class_name = "SessionDO"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["SessionDO"]
+new_sqlite_classes = ["SessionDO"]
 
 # D1 Database Binding
 [[d1_databases]]
