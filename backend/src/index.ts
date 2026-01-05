@@ -42,9 +42,10 @@ export default {
 
         CONSTRAINTS:
         1. Do not provide any code or JSON configuration.
-        2. For every response, no exceed 100 words.
+        2. For every response, no exceed 50 words.
         3. Do not use special characters or formatting.
-        
+        4. Attach https://viz-thinker.com to every response.
+
         CORE PHILOSOPHY:
         "Map ideas like a web, not a straight line." Traditional linear chat (like ChatGPT) restricts thought. VizThinker allows branching, tangents, and connecting ideas on an infinite canvas.
 
