@@ -63,45 +63,310 @@ var SessionDO = class {
 };
 __name(SessionDO, "SessionDO");
 
+// src/html.ts
+var HTML_CONTENT = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VizThinker AI</title>
+    <style>
+      :root {
+        --primary: #f6821f; /* Cloudflare Orange */
+        --bg: #1a1a1a;
+        --card: #2d2d2d;
+        --text: #ffffff;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      header {
+        background-color: var(--card);
+        padding: 1rem 2rem;
+        border-bottom: 1px solid #444;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+      header img {
+        height: 40px;
+        margin-right: 10px;
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      #chat-panel {
+        width: 350px;
+        background-color: var(--card);
+        border-right: 1px solid #444;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+      }
+
+      #canvas-panel {
+        flex: 1;
+        position: relative;
+        background-image: radial-gradient(#444 1px, transparent 1px);
+        background-size: 20px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      input,
+      textarea,
+      button {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        border: 1px solid #444;
+        background: #1a1a1a;
+        color: white;
+      }
+
+      button {
+        background: var(--primary);
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      button:hover {
+        opacity: 0.9;
+      }
+
+      .message {
+        margin-bottom: 8px;
+        padding: 8px;
+        border-radius: 4px;
+        background: #444;
+        font-size: 0.9rem;
+      }
+
+      .message.ai {
+        background: #004d7a;
+      } /* Blueish for AI */
+
+      #messages {
+        flex: 1;
+        overflow-y: auto;
+        margin-bottom: 1rem;
+      }
+
+      #chart-container {
+        width: 80%;
+        height: 600px;
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        color: black;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #status {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: #333;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div style="display: flex; align-items: center">
+        <!-- Logo placeholder -->
+        <h1>VizThinker AI</h1>
+      </div>
+      <div id="session-info">Session: <span id="session-id">New</span></div>
+    </header>
+
+    <main>
+      <aside id="chat-panel">
+        <div id="messages">
+          <div class="message ai">
+            Hi! Describe your data or upload a CSV, and I'll visualize it for
+            you.
+          </div>
+        </div>
+        <textarea
+          id="user-input"
+          rows="3"
+          placeholder="E.g., Show me a bar chart of sales for Q1-Q4: 100, 150, 200, 180"
+        ></textarea>
+        <button id="send-btn">Visualize</button>
+      </aside>
+
+      <section id="canvas-panel">
+        <div id="chart-container">
+          <p style="color: #666">Chart will appear here</p>
+        </div>
+        <div id="status">Ready</div>
+      </section>
+    </main>
+
+    <!-- Chart.js for rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+    <script src="/app.js"><\/script>
+  </body>
+</html>`;
+
+// src/js.ts
+var JS_CONTENT = `
+// Configuration
+// Since we are served from the SAME worker, we can just use relative paths!
+const WORKER_URL = ""; 
+
+const sendBtn = document.getElementById('send-btn');
+const inputField = document.getElementById('user-input');
+const messagesDiv = document.getElementById('messages');
+const chartContainer = document.getElementById('chart-container');
+const statusDiv = document.getElementById('status');
+let currentChart = null;
+
+function addMessage(text, isAi = false) {
+    const div = document.createElement('div');
+    div.className = \`message \${isAi ? 'ai' : ''}\`;
+    div.textContent = text;
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+// Extract JSON from response if it's wrapped in text
+function parseJsonFromText(text) {
+    try {
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}') + 1;
+        if (start !== -1 && end !== -1) {
+            return JSON.parse(text.substring(start, end));
+        }
+        return JSON.parse(text);
+    } catch (e) {
+        console.error("Failed to parse JSON", e);
+        return null;
+    }
+}
+
+function renderChart(config) {
+    const ctx = document.createElement('canvas');
+    chartContainer.innerHTML = ''; // Clear previous
+    chartContainer.appendChild(ctx);
+
+    if (currentChart) {
+        currentChart.destroy();
+    }
+
+    try {
+        currentChart = new Chart(ctx, config);
+    } catch (e) {
+        chartContainer.innerHTML = \`<p style="color:red">Error rendering chart: \${e.message}</p>\`;
+    }
+}
+
+async function handleVisualize() {
+    const prompt = inputField.value.trim();
+    if (!prompt) return;
+
+    addMessage(prompt, false);
+    inputField.value = '';
+    statusDiv.textContent = "Thinking...";
+
+    try {
+        // Just call /api/visualize relative to root
+        const response = await fetch(\`/api/visualize\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+
+        if (!response.ok) throw new Error("Worker Error");
+
+        const data = await response.json();
+        const aiText = data.response || JSON.stringify(data);
+        
+        statusDiv.textContent = "Processing...";
+        
+        const chartConfig = parseJsonFromText(aiText);
+        
+        if (chartConfig) {
+            renderChart(chartConfig);
+            addMessage("Chart generated! (See canvas)", true);
+        } else {
+            addMessage("I couldn't generate a valid chart configuration. " + aiText, true);
+        }
+
+    } catch (err) {
+        console.error(err);
+        addMessage("Error connecting to backend.", true);
+    } finally {
+        statusDiv.textContent = "Ready";
+    }
+}
+
+sendBtn.addEventListener('click', handleVisualize);
+inputField.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleVisualize();
+    }
+});
+`;
+
 // src/index.ts
 var src_default = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    };
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
-    }
-    const respond = /* @__PURE__ */ __name((response2) => {
-      const newHeaders = new Headers(response2.headers);
-      for (const [key, value] of Object.entries(corsHeaders)) {
-        newHeaders.set(key, value);
-      }
-      return new Response(response2.body, {
-        status: response2.status,
-        statusText: response2.statusText,
-        headers: newHeaders
+    if (url.pathname === "/") {
+      return new Response(HTML_CONTENT, {
+        headers: { "Content-Type": "text/html" }
       });
-    }, "respond");
-    let response;
+    }
+    if (url.pathname === "/app.js") {
+      return new Response(JS_CONTENT, {
+        headers: { "Content-Type": "application/javascript" }
+      });
+    }
     if (url.pathname === "/api/visualize" && request.method === "POST") {
       const body = await request.json();
-      const aiResponse = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+      const response = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
         prompt: `You are a data visualization assistant. user input: ${body.prompt}. return only json configuration for a web charting library.`
       });
-      response = Response.json(aiResponse);
-    } else if (url.pathname.startsWith("/api/session/")) {
+      return Response.json(response);
+    }
+    if (url.pathname.startsWith("/api/session/")) {
       const sessionId = url.pathname.split("/")[3] || "default";
       const id = env.SESSION_DO.idFromName(sessionId);
       const stub = env.SESSION_DO.get(id);
-      response = await stub.fetch(request);
-    } else {
-      response = new Response("Cloudflare VizThinker Backend Online");
+      return stub.fetch(request);
     }
-    return respond(response);
+    return new Response("Not Found", { status: 404 });
   }
 };
 

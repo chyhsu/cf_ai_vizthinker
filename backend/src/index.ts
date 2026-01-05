@@ -1,14 +1,4 @@
 
-import { SessionDO } from "./durable_object";
-
-export { SessionDO };
-
-export interface Env {
-  AI: any;
-  DB: D1Database;
-  SESSION_DO: DurableObjectNamespace;
-}
-
 
 import { SessionDO } from "./durable_object";
 import { HTML_CONTENT } from "./html";
