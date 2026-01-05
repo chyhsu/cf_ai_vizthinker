@@ -1,0 +1,23 @@
+name = "cf_ai_vizthinker_backend"
+main = "src/index.ts"
+compatibility_date = "2024-04-05"
+compatibility_flags = ["nodejs_compat"]
+
+# AI Binding
+[ai]
+binding = "AI"
+
+# Durable Object Binding
+[[durable_objects.bindings]]
+name = "SESSION_DO"
+class_name = "SessionDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["SessionDO"]
+
+# D1 Database Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "vizthinker-db"
+database_id = "d1d63816-6c17-48e5-97d8-67b323ea42b9"

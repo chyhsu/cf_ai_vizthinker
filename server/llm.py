@@ -1,0 +1,291 @@
+import os
+import google.generativeai as genai
+# import ollama
+from server.logger import logger
+from server.dao.postgre import get_path_history, get_messages
+from typing import Optional
+from server.dao.postgre import get_user_api_key
+
+# api_key_map={
+#     "google": os.getenv("GEMINI_API_KEY"),
+#     "openai": os.getenv("OPENAI_API_KEY"),
+#     "x": os.getenv("GROK_API_KEY"),
+#     "anthropic": os.getenv("CLAUDE_API_KEY"),
+#     "ollama": None,  # Ollama doesn't need API key for local models
+# }
+
+basic_system_prompt = """
+You are an assistant in VizThinker, a chat-based application that visualizes conversations as graph nodes (representing prompts and responses) with edges (representing meaningful relationships). You will receive a chat history structured as a sequence of nodes and edges.
+
+Your task is to generate a response to the user's latest prompt by referencing the context of the chat history.
+
+**Key guidelines:**
+- Focus especially on the most recent chat node (e.g., in [chatnode1, chatnode2, chatnode3], prioritize chatnode3).
+- Do **not** repeat or summarize the chat history.
+- Use your full 500-token budget to provide a thoughtful, structured, and professional response.
+- Favor clear, layered formatting using:
+  - **Big titles** and **subtitles**
+  - **Lists** or **tables**, where appropriate
+  - Logical sectioning for enhanced readability
+
+**Example Markdown (no code fences):**
+
+| Feature | Option A | Option B |
+|---------|----------|----------|
+| Speed   | Fast     | Slow     |
+
+- Use headings like `## Section Title` to introduce new sections.
+- Keep tables and lists in plain Markdown without surrounding triple backticks.
+
+Your response should maintain a clean and professional tone while advancing the conversation coherently and insightfully.
+"""
+
+
+branch_system_prompt = "This prompt branches from the latest chat node, meaning the user wants to explore a new direction based on your most recent response. Focus primarily on your last reply, expanding or deepening the ideas introduced there. Avoid repeating the chat history. Instead, develop a well-structured, professional response that pushes the current line of thought further."
+
+markdown_system_prompt = """ You will receive a chat history composed of a sequence of prompts and responses.
+
+Your task is to generate a Markdown-formatted report, referencing the context of the chat history. Each node’s relationship should inform your reasoning:
+
+    If the current node is a branch of its parent, treat it as a deeper elaboration or detail of the parent node.
+
+    If it is not a branch, treat it as a progression to the next stage of the conversation.
+
+Your response should be structured, professional, and reflect the graph’s conversational logic. Do not repeat the chat history. Do not include the earliest chat history, which is introducing VizThinker to help user understand how to use the application, as it is not relevant to the current conversation. Do not include your thinking process.
+
+Use Markdown formatting to improve clarity. For example:
+
+## Key Takeaways
+
+- The user wants to explore the scalability of the current solution.
+- A distributed architecture was previously mentioned and should be elaborated.
+
+## Recommendation
+
+Consider implementing a message queue (e.g., RabbitMQ or Kafka) to decouple services and improve scalability."""
+
+async def generate_markdown(user_id: int, user_prompt: str, provider: str, parent_id: Optional[int] = None, chatrecord_id: Optional[int] = None, isbranch: Optional[bool] = False, model: Optional[str] = None):
+    return await call_llm(user_id, user_prompt, provider, parent_id, chatrecord_id, isbranch, True, model)
+
+async def call_llm(user_id: int, user_prompt: str, provider: str, parent_id: Optional[int] = None, chatrecord_id: Optional[int] = None, isbranch: Optional[bool] = False, ismarkdown: Optional[bool] = False, model: Optional[str] = None, files: Optional[list] = None):
+    
+    api_key = None
+    # Ollama runs locally and does not require an API key
+    api_key = await get_user_api_key(user_id, provider)
+    if not api_key:
+        raise RuntimeError(f"{provider} API key not set.")
+    
+    if parent_id is not None:
+        # get_path_history now expects only message_id
+        chat_history = await get_path_history(parent_id)
+    else:
+        chat_history = []
+    
+    if ismarkdown:
+        chat_history = await get_messages(chatrecord_id)
+    global system_prompt
+    global branch_system_prompt
+
+    if isbranch:
+        system_prompt = basic_system_prompt + branch_system_prompt
+    else:
+        system_prompt = basic_system_prompt
+
+    if ismarkdown:
+        system_prompt = markdown_system_prompt
+    
+    system_prompt = system_prompt + "\n\nChat history: " + str(chat_history)[1:]
+    
+    # For each Provider
+    if provider == "google":
+        try:
+            import base64
+            genai.configure(api_key=api_key)
+            # Use provided model or default
+            model_name = model or 'gemini-2.5-flash'
+            gemini_model = genai.GenerativeModel(
+                model_name=model_name,
+                system_instruction=system_prompt
+            )
+            logger.info(f"Calling LLM with user_prompt: {user_prompt}, provider: {provider}, model: {model_name}, files: {len(files) if files else 0}")
+
+            # Build multimodal content if files are present
+            if files:
+                # Create parts list with images and text
+                parts = []
+                for file in files:
+                    # Decode base64 data
+                    file_bytes = base64.b64decode(file['data'])
+                    parts.append({
+                        'inline_data': {
+                            'mime_type': file['mime_type'],
+                            'data': file['data']
+                        }
+                    })
+                # Add text prompt if present, otherwise use default
+                if user_prompt and user_prompt.strip():
+                    parts.append({'text': user_prompt})
+                else:
+                    parts.append({'text': 'Describe this image in detail.'})
+                
+                response = await gemini_model.generate_content_async(
+                    parts,
+                    request_options={'timeout': 30}
+                )
+            else:
+                # Text-only path
+                response = await gemini_model.generate_content_async(
+                    user_prompt,
+                    request_options={'timeout': 30}
+                )
+
+            logger.info(f"Received response from LLM: {len(response.text)} tokens")
+
+            return response.text
+            
+        except ValueError as ve:
+            logger.error(f"Value error in LLM call: {str(ve)}")
+            raise RuntimeError(f"Invalid input: {str(ve)}")
+            
+        except Exception as e:
+            if "quota" in str(e).lower():
+                logger.error(f"API usage limit hit for Google: {e}", exc_info=True)
+                raise RuntimeError(f"API usage limit hit for {provider}. Please check your plan and billing details.")
+            logger.error(f"An unexpected error occurred when calling Google Gemini API: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to generate content: {e}")
+
+
+    # elif provider == "ollama":
+    #     try:
+    #         # Use provided model or default
+    #         model_name = model or 'gemma3:latest'
+    #         logger.info(f"Calling Ollama with user_prompt: {user_prompt}, provider: {provider}, model: {model_name}")
+            
+    #         # Use ollama.chat for better control over the conversation
+    #         response = ollama.chat(
+    #             model=model_name,
+    #             messages=[
+    #                 {
+    #                     'role': 'system',
+    #                     'content': system_prompt
+    #                 },
+    #                 {
+    #                     'role': 'user', 
+    #                     'content': user_prompt
+    #                 }
+    #             ]
+    #         )
+            
+    #         response_text = response['message']['content']
+    #         logger.info(f"Received response from Ollama: {len(response_text)} tokens")
+
+    #         return response_text
+            
+    #     except Exception as e:
+    #         logger.error(f"An unexpected error occurred when calling Ollama: {e}", exc_info=True)
+    #         raise RuntimeError(f"Failed to generate content from Ollama: {e}")
+    
+    elif provider == "openai":
+        try:
+            import openai
+            openai.api_key = api_key
+            
+            # Use provided model or default
+            model_name = model or 'gpt-4o'
+            logger.info(f"Calling OpenAI with user_prompt: {user_prompt}, provider: {provider}, model: {model_name}")
+            
+            # Create OpenAI client
+            client = openai.OpenAI(api_key=api_key)
+            
+            # Prepare messages for OpenAI
+            messages = [{"role": "system", "content": system_prompt}]
+            messages.append({"role": "user", "content": user_prompt})
+            
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=300,
+                temperature=0.7
+            )
+            
+            response_text = response.choices[0].message.content
+            logger.info(f"Received response from OpenAI: {len(response_text)} tokens")
+            
+            return response_text
+            
+        except openai.RateLimitError as e:
+            logger.error(f"OpenAI API rate limit exceeded: {e}", exc_info=True)
+            raise RuntimeError(f"API usage limit hit for {provider}. Please check your plan and billing details.")
+        except Exception as e:
+            logger.error(f"An unexpected error occurred when calling OpenAI API: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to generate content from OpenAI: {e}")
+    
+    elif provider == "anthropic":
+        try:
+            import anthropic
+            
+            # Use provided model or default
+            model_name = model or 'claude-3-5-sonnet-20240620'
+            logger.info(f"Calling Anthropic with user_prompt: {user_prompt}, provider: {provider}, model: {model_name}")
+            
+            # Create Anthropic client
+            client = anthropic.Anthropic(api_key=api_key)
+            
+            response = client.messages.create(
+                model=model_name,
+                max_tokens=300,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+            
+            response_text = response.content[0].text
+            logger.info(f"Received response from Anthropic: {len(response_text)} tokens")
+            
+            return response_text
+            
+        except anthropic.RateLimitError as e:
+            logger.error(f"Anthropic API rate limit exceeded: {e}", exc_info=True)
+            raise RuntimeError(f"API usage limit hit for {provider}. Please check your plan and billing details.")
+        except Exception as e:
+            logger.error(f"An unexpected error occurred when calling Anthropic API: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to generate content from Anthropic: {e}")
+    
+    elif provider == "x":
+        try:
+            import openai
+            
+            # Use provided model or default  
+            model_name = model or 'grok-1'
+            logger.info(f"Calling X (Grok) with user_prompt: {user_prompt}, provider: {provider}, model: {model_name}")
+            
+            # Create OpenAI-compatible client for X/Grok
+            client = openai.OpenAI(
+                api_key=api_key,
+                base_url="https://api.x.ai/v1"
+            )
+            
+            # Prepare messages
+            messages = [{"role": "system", "content": system_prompt}]
+            messages.append({"role": "user", "content": user_prompt})
+            
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=300,
+                temperature=0.7
+            )
+            
+            response_text = response.choices[0].message.content
+            logger.info(f"Received response from X (Grok): {len(response_text)} tokens")
+            
+            return response_text
+            
+        except openai.RateLimitError as e:
+            logger.error(f"X/Grok API rate limit exceeded: {e}", exc_info=True)
+            raise RuntimeError(f"API usage limit hit for {provider}. Please check your plan and billing details.")
+        except Exception as e:
+            logger.error(f"An unexpected error occurred when calling X (Grok) API: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to generate content from X (Grok): {e}")
+    
+    else:
+        raise RuntimeError(f"Unsupported provider: {provider}")
