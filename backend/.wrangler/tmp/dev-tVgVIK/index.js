@@ -72,15 +72,14 @@ var HTML_CONTENT = `<!DOCTYPE html>
     <title>VizThinker AI</title>
     <style>
       :root {
-        --primary: #f6821f; /* Cloudflare Orange */
+        --primary: #f6821f;
         --bg: #1a1a1a;
         --card: #2d2d2d;
         --text: #ffffff;
       }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Helvetica, Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         background-color: var(--bg);
         color: var(--text);
         margin: 0;
@@ -94,203 +93,128 @@ var HTML_CONTENT = `<!DOCTYPE html>
         background-color: var(--card);
         padding: 1rem 2rem;
         border-bottom: 1px solid #444;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        text-align: center;
       }
 
-      header h1 {
-        margin: 0;
-        font-size: 1.5rem;
-      }
-      header img {
-        height: 40px;
-        margin-right: 10px;
-      }
+      header h1 { margin: 0; font-size: 1.5rem; }
 
       main {
         flex: 1;
         display: flex;
-        overflow: hidden;
-      }
-
-      #chat-panel {
-        width: 350px;
-        background-color: var(--card);
-        border-right: 1px solid #444;
-        display: flex;
         flex-direction: column;
-        padding: 1rem;
-      }
-
-      #canvas-panel {
-        flex: 1;
-        position: relative;
-        background-image: radial-gradient(#444 1px, transparent 1px);
-        background-size: 20px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      input,
-      textarea,
-      button {
+        max-width: 800px;
+        margin: 0 auto;
         width: 100%;
-        padding: 10px;
-        margin-bottom: 10px;
-        border-radius: 4px;
-        border: 1px solid #444;
-        background: #1a1a1a;
-        color: white;
+        padding: 20px;
+        box-sizing: border-box;
       }
-
-      button {
-        background: var(--primary);
-        color: white;
-        border: none;
-        cursor: pointer;
-        font-weight: bold;
-      }
-
-      button:hover {
-        opacity: 0.9;
-      }
-
-      .message {
-        margin-bottom: 8px;
-        padding: 8px;
-        border-radius: 4px;
-        background: #444;
-        font-size: 0.9rem;
-      }
-
-      .message.ai {
-        background: #004d7a;
-      } /* Blueish for AI */
 
       #messages {
         flex: 1;
         overflow-y: auto;
-        margin-bottom: 1rem;
-      }
-
-      #chart-container {
-        width: 80%;
-        height: 600px;
-        background: white;
+        margin-bottom: 20px;
+        padding: 10px;
+        background: #252525;
         border-radius: 8px;
-        padding: 20px;
-        color: black;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        border: 1px solid #444;
       }
 
-      #status {
-        position: absolute;
-        bottom: 20px;
-        right: 20px;
+      .message {
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 8px;
         background: #333;
-        padding: 5px 10px;
-        border-radius: 4px;
+        line-height: 1.5;
+        max-width: 85%;
+      }
+
+      .message.user {
+        background: #444;
+        align-self: flex-end;
+        margin-left: auto;
+      }
+
+      .message.ai {
+        background: #005a9c;
+        align-self: flex-start;
+        margin-right: auto;
+      }
+
+      #input-area {
+        display: flex;
+        gap: 10px;
+      }
+
+      textarea {
+        flex: 1;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #555;
+        background: #2d2d2d;
+        color: white;
+        resize: none;
+        height: 50px;
+      }
+
+      button {
+        width: 100px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      button:hover { opacity: 0.9; }
+      
+      #status {
+        text-align: center;
         font-size: 0.8rem;
-        opacity: 0.7;
+        color: #888;
+        margin-top: 5px;
       }
     </style>
   </head>
   <body>
     <header>
-      <div style="display: flex; align-items: center">
-        <!-- Logo placeholder -->
-        <h1>VizThinker AI</h1>
-      </div>
-      <div id="session-info">Session: <span id="session-id">New</span></div>
+      <h1>VizThinker AI</h1>
     </header>
 
     <main>
-      <aside id="chat-panel">
-        <div id="messages">
-          <div class="message ai">
-            Hi! Describe your data or upload a CSV, and I'll visualize it for
-            you.
-          </div>
+      <div id="messages">
+        <div class="message ai">
+          Hello! I am your AI assistant running on Cloudflare Workers. Ask me anything!
         </div>
-        <textarea
-          id="user-input"
-          rows="3"
-          placeholder="E.g., Show me a bar chart of sales for Q1-Q4: 100, 150, 200, 180"
-        ></textarea>
-        <button id="send-btn">Visualize</button>
-      </aside>
+      </div>
 
-      <section id="canvas-panel">
-        <div id="chart-container">
-          <p style="color: #666">Chart will appear here</p>
-        </div>
-        <div id="status">Ready</div>
-      </section>
+      <div id="input-area">
+        <textarea id="user-input" placeholder="Type your message..."></textarea>
+        <button id="send-btn">Send</button>
+      </div>
+      <div id="status">Ready</div>
     </main>
 
-    <!-- Chart.js for rendering -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
     <script src="/app.js"><\/script>
   </body>
 </html>`;
 
 // src/js.ts
 var JS_CONTENT = `
-// Configuration
-// Since we are served from the SAME worker, we can just use relative paths!
-const WORKER_URL = ""; 
-
 const sendBtn = document.getElementById('send-btn');
 const inputField = document.getElementById('user-input');
 const messagesDiv = document.getElementById('messages');
-const chartContainer = document.getElementById('chart-container');
 const statusDiv = document.getElementById('status');
-let currentChart = null;
 
-function addMessage(text, isAi = false) {
+function addMessage(text, isAi) {
     const div = document.createElement('div');
-    div.className = \`message \${isAi ? 'ai' : ''}\`;
+    div.className = \`message \${isAi ? 'ai' : 'user'}\`;
     div.textContent = text;
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// Extract JSON from response if it's wrapped in text
-function parseJsonFromText(text) {
-    try {
-        const start = text.indexOf('{');
-        const end = text.lastIndexOf('}') + 1;
-        if (start !== -1 && end !== -1) {
-            return JSON.parse(text.substring(start, end));
-        }
-        return JSON.parse(text);
-    } catch (e) {
-        console.error("Failed to parse JSON", e);
-        return null;
-    }
-}
-
-function renderChart(config) {
-    const ctx = document.createElement('canvas');
-    chartContainer.innerHTML = ''; // Clear previous
-    chartContainer.appendChild(ctx);
-
-    if (currentChart) {
-        currentChart.destroy();
-    }
-
-    try {
-        currentChart = new Chart(ctx, config);
-    } catch (e) {
-        chartContainer.innerHTML = \`<p style="color:red">Error rendering chart: \${e.message}</p>\`;
-    }
-}
-
-async function handleVisualize() {
+async function handleSend() {
     const prompt = inputField.value.trim();
     if (!prompt) return;
 
@@ -299,7 +223,6 @@ async function handleVisualize() {
     statusDiv.textContent = "Thinking...";
 
     try {
-        // Just call /api/visualize relative to root
         const response = await fetch(\`/api/visualize\`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -309,32 +232,24 @@ async function handleVisualize() {
         if (!response.ok) throw new Error("Worker Error");
 
         const data = await response.json();
-        const aiText = data.response || JSON.stringify(data);
+        // Llama often returns the text in .response
+        const reply = data.response || JSON.stringify(data);
         
-        statusDiv.textContent = "Processing...";
-        
-        const chartConfig = parseJsonFromText(aiText);
-        
-        if (chartConfig) {
-            renderChart(chartConfig);
-            addMessage("Chart generated! (See canvas)", true);
-        } else {
-            addMessage("I couldn't generate a valid chart configuration. " + aiText, true);
-        }
+        addMessage(reply, true);
 
     } catch (err) {
         console.error(err);
-        addMessage("Error connecting to backend.", true);
+        addMessage("Error: Could not connect to AI.", true);
     } finally {
         statusDiv.textContent = "Ready";
     }
 }
 
-sendBtn.addEventListener('click', handleVisualize);
+sendBtn.addEventListener('click', handleSend);
 inputField.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        handleVisualize();
+        handleSend();
     }
 });
 `;
@@ -356,7 +271,7 @@ var src_default = {
     if (url.pathname === "/api/visualize" && request.method === "POST") {
       const body = await request.json();
       const response = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
-        prompt: `You are a data visualization assistant. user input: ${body.prompt}. return only json configuration for a web charting library.`
+        prompt: `You are a helpful AI assistant running on Cloudflare Workers. User input: ${body.prompt}`
       });
       return Response.json(response);
     }

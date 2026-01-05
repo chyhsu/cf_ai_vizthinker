@@ -34,7 +34,7 @@ export default {
     if (url.pathname === "/api/visualize" && request.method === "POST") {
       const body = await request.json() as { prompt: string };
       const response = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
-        prompt: `You are a data visualization assistant. user input: ${body.prompt}. return only json configuration for a web charting library.`,
+        prompt: `You are a helpful AI assistant running on Cloudflare Workers. User input: ${body.prompt}`,
       });
       return Response.json(response);
     }
