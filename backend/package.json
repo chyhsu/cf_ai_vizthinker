@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
+    "build": "echo 'Build is handled by wrangler deploy'",
     "dev": "wrangler dev",
     "start": "wrangler dev"
   },
