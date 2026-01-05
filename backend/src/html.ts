@@ -118,7 +118,9 @@ export const HTML_CONTENT = `<!DOCTYPE html>
     <main>
       <div id="messages">
         <div class="message ai">
-          Hello! I am your AI assistant running on Cloudflare Workers. Ask me anything!
+          <strong>Are You a VizThinker?</strong><br><br>
+          If your brain loves to map ideas like a web—seeing connections everywhere instead of a straight line—you've found your home.<br><br>
+          I am here to introduce <strong>VizThinker AI</strong>: The node-based interface that turns your chats into dynamic, interactive thinking maps. Ask me anything about how we break the linear mold!
         </div>
       </div>
 

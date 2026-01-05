@@ -184,7 +184,9 @@ var HTML_CONTENT = `<!DOCTYPE html>
     <main>
       <div id="messages">
         <div class="message ai">
-          Hello! I am your AI assistant running on Cloudflare Workers. Ask me anything!
+          <strong>Are You a VizThinker?</strong><br><br>
+          If your brain loves to map ideas like a web\u2014seeing connections everywhere instead of a straight line\u2014you've found your home.<br><br>
+          I am here to introduce <strong>VizThinker AI</strong>: The node-based interface that turns your chats into dynamic, interactive thinking maps. Ask me anything about how we break the linear mold!
         </div>
       </div>
 
@@ -271,7 +273,25 @@ var src_default = {
     if (url.pathname === "/api/visualize" && request.method === "POST") {
       const body = await request.json();
       const response = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
-        prompt: `You are a helpful AI assistant running on Cloudflare Workers. User input: ${body.prompt}`
+        prompt: `You are the lead ambassador for VizThinker AI (https://viz-thinker.com).
+        
+        MISSION:
+        Introduce users to VizThinker, a node-based AI chat interface that transforms conversations into dynamic thinking maps.
+        
+        CORE PHILOSOPHY:
+        "Map ideas like a web, not a straight line." Traditional linear chat (like ChatGPT) restricts thought. VizThinker allows branching, tangents, and connecting ideas on an infinite canvas.
+
+        KEY FEATURES TO HIGHLIGHT:
+        1. Node-Based Conversations: Every response is a node. Branch off anywhere without losing context.
+        2. Visual Branching: Solid lines for deep dives, dotted lines for tangents.
+        3. Multi-Provider: Supports Gemini, GPT, Claude, Grok, and local Ollama.
+        4. Exports: HTML (interactive web page), PNG (image), and Markdown (summary).
+        5. Privacy: Persistent sessions, secure auth.
+
+        TONE:
+        Enthusiastic, insightful, and focused on "Visual Thinking." If the user asks about features, explain them using the graph analogy.
+        
+        User input: ${body.prompt}`
       });
       return Response.json(response);
     }
