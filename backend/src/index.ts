@@ -9,59 +9,56 @@ export interface Env {
   SESSION_DO: DurableObjectNamespace;
 }
 
+
+import { SessionDO } from "./durable_object";
+import { HTML_CONTENT } from "./html";
+import { JS_CONTENT } from "./js";
+
+export { SessionDO };
+
+export interface Env {
+  AI: any;
+  DB: D1Database;
+  SESSION_DO: DurableObjectNamespace;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    // CORS Headers
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
-
-    // Handle Preflight Options
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
+    // Serve HTML (Frontend)
+    if (url.pathname === "/") {
+      return new Response(HTML_CONTENT, {
+        headers: { "Content-Type": "text/html" },
+      });
     }
 
-    // Helper to wrap response with CORS
-    const respond = (response: Response) => {
-      const newHeaders = new Headers(response.headers);
-      for (const [key, value] of Object.entries(corsHeaders)) {
-        newHeaders.set(key, value);
-      }
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
+    // Serve JS (Frontend)
+    if (url.pathname === "/app.js") {
+      return new Response(JS_CONTENT, {
+        headers: { "Content-Type": "application/javascript" },
       });
-    };
-
-    let response: Response;
+    }
 
     // AI Endpoint
     if (url.pathname === "/api/visualize" && request.method === "POST") {
       const body = await request.json() as { prompt: string };
-      const aiResponse = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+      const response = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
         prompt: `You are a data visualization assistant. user input: ${body.prompt}. return only json configuration for a web charting library.`,
       });
-      response = Response.json(aiResponse);
+      return Response.json(response);
     }
-    
+
     // Session State (Durable Object)
-    else if (url.pathname.startsWith("/api/session/")) {
+    if (url.pathname.startsWith("/api/session/")) {
         const sessionId = url.pathname.split("/")[3] || "default";
         const id = env.SESSION_DO.idFromName(sessionId);
         const stub = env.SESSION_DO.get(id);
-        response = await stub.fetch(request);
+        return stub.fetch(request);
     }
 
-    // Default
-    else {
-        response = new Response("Cloudflare VizThinker Backend Online");
-    }
-
-    return respond(response);
+    // Default 404
+    return new Response("Not Found", { status: 404 });
   },
 };
+

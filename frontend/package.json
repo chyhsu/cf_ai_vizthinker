@@ -1,9 +1,0 @@
-{
-  "name": "cf-ai-vizthinker-frontend",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "wrangler pages dev public",
-    "deploy": "wrangler pages deploy public"
-  }
-}

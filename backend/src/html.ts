@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+export const HTML_CONTENT = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -168,6 +168,6 @@
 
     <!-- Chart.js for rendering -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="app.js"></script>
+    <script src="/app.js"></script>
   </body>
-</html>
+</html>`;
